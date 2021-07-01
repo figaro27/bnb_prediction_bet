@@ -19,8 +19,8 @@
  */
 
 var HDWalletProvider = require("truffle-hdwallet-provider");
-const mnemonic = '';
-const bscscanapikey = '';
+const mnemonic = 'nose square hammer seminar used truth inform warrior winner middle zero business';
+const bscscanapikey = 'A2A2B6NXEBZA6TZ9SJP8VUX84FA32I76SM';
 
 module.exports = {
   /**
@@ -96,7 +96,7 @@ module.exports = {
 
   // Set default mocha options here, use special reporters etc.
   mocha: {
-    // timeout: 100000
+    timeout: 100000
   },
 
   // Configure your compilers
