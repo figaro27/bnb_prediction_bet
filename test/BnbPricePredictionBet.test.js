@@ -1,4 +1,5 @@
 const BnbPricePredictionBet = artifacts.require('BnbPricePredictionBet');
+const BnbTest = artifacts.require('BnbTest');
 const { expect } = require('chai');
 const {
   BN,           // Big Number support
@@ -11,21 +12,23 @@ const timeTraveler = require('ganache-time-traveler');
 const weiAmount = amount =>
   new BN(amount).mul(new BN(10).pow(new BN(8)));
 
-contract('::BnbPricePredictionBet', async accounts => {
+contract('::BnbTest', async accounts => {
   let predictionBet;
   const [alice, bob, carl] = accounts;
 
   beforeEach(async () => {
-    predictionBet = await BnbPricePredictionBet.new();
+    predictionBet = await BnbTest.new();
   });
 
   describe('Round', async () => {
     it('genesisStartRound', async () => {
-      await predictionBet.genesisStartRound({from: bob});
-      // expectEvent(await predictionBet.genesisStartRound({from: bob}), 'StartRound');
+      // await predictionBet.genesisStartRound({from: bob});
+      expectEvent(await predictionBet.genesisStartRound({from: bob}), 'StartRound');
       
-      // timeTraveler.advanceTime(15);
-      // expectEvent(await predictionBet.genesisLockRound({from: bob}), 'LockRound');
+      timeTraveler.advanceTime(12);
+      expectEvent(await predictionBet.betDown({from: bob, value: 10000000}), 'BetDown', {sender: bob, currentEpoch: new BN(1), amount: new BN(10000000)});     
+      timeTraveler.advanceTime(65);
+      expectEvent(await predictionBet.betUp({from: bob, value: 10000000}), 'BetUp', {sender: bob, currentEpoch: new BN(1), amount: new BN(10000000)});
     });
   });
 });

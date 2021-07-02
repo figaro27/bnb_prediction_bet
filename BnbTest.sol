@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
-contract BnbPricePredictionBet is Ownable {
+contract BnbTest is Ownable {
     using SafeMath for uint256;
     enum Position {Up, Down}
     struct Round {
@@ -48,11 +48,14 @@ contract BnbPricePredictionBet is Ownable {
     bool public genesisStartOnce = false;
     bool public genesisLockOnce = false;
 
-    event StartRound(uint256 indexed epoch, uint256 startTime, int256 price);
+    event StartRound(uint256 indexed epoch, uint256 startTime, uint256 endTime, int256 price);
     event EndRound(uint256 indexed epoch, uint256 blockTime, int256 price);
 
     event BetUp(address indexed sender, uint256 indexed currentEpoch, uint256 amount);
     event BetDown(address indexed sender, uint256 indexed currentEpoch, uint256 amount);
+
+    event BetTest(uint256 blocktimestamp, uint256 roundendTime, uint256 indexed currentEpoch);
+
     event Claim(address indexed sender, uint256 indexed currentEpoch, uint256 amount);
     event ClaimTreasury(uint256 amount);
     event RewardsCalculated(
@@ -91,14 +94,15 @@ contract BnbPricePredictionBet is Ownable {
         Round storage round = rounds[epoch];
         round.startTime = block.timestamp;
         round.lockTime = block.timestamp.add(betTime);
-        round.endTime = block.timestamp.add(roundTime + betTime);
+        round.endTime = block.timestamp.add(roundTime).add(betTime);
         round.epoch = epoch;
         round.totalAmount = 0;
-        int256 currentPrice = _getPriceFromOracle();
+        int256 currentPrice = 12345;
+        // int256 currentPrice = 12345;
         round.startPrice = currentPrice;
         round.status = true;
 
-        emit StartRound(epoch, block.timestamp, round.startPrice);
+        emit StartRound(epoch, block.timestamp, round.endTime, round.startPrice);
     }
 
     function getStatus() external view returns (uint256, uint256, uint256, int256, int256, bool, uint256) {
@@ -122,7 +126,7 @@ contract BnbPricePredictionBet is Ownable {
      */
     function _safeEndRound() internal {
         require(block.timestamp >= rounds[currentEpoch].endTime, "Can only end round after endTime");
-        int256 currentPrice = _getPriceFromOracle();
+        int256 currentPrice = 12345;
         Round storage round = rounds[currentEpoch];
         round.closePrice = currentPrice;
         round.status = false;
@@ -139,7 +143,7 @@ contract BnbPricePredictionBet is Ownable {
      */
     function betDown() external payable {
         if(block.timestamp >= rounds[currentEpoch].endTime) {
-            uint tempCurrentEpoch = currentEpoch;
+            uint256 tempCurrentEpoch = currentEpoch;
             _safeEndRound();
             claim(tempCurrentEpoch);
         }
@@ -167,10 +171,10 @@ contract BnbPricePredictionBet is Ownable {
      */
     function betUp() external payable {
         if(block.timestamp >= rounds[currentEpoch].endTime) {
-            uint tempCurrentEpoch = currentEpoch;
+            uint256 tempCurrentEpoch = currentEpoch;
             _safeEndRound();
             claim(tempCurrentEpoch);
-        }
+        }        
         require(_bettable(currentEpoch), "Round not bettable");
         require(msg.value >= minBetAmount, "Bet amount must be greater than minBetAmount");
         // require(ledger[currentEpoch][msg.sender].amount == 0, "Can only bet once per round");
@@ -207,17 +211,17 @@ contract BnbPricePredictionBet is Ownable {
         require(!ledger[epoch][msg.sender].claimed, "Rewards claimed");
 
         uint256 reward = 0;     
-        // Round valid, claim rewards
+        // Round valid, claim rewards      
         if (rounds[epoch].oracleCalled) {
             require(claimable(epoch, msg.sender), "Not eligible for claim");
             Round memory round = rounds[epoch];
             uint256 rewardAmount = round.totalAmount.mul(rewardRate).div(TOTAL_RATE);
-            if(rounds[epoch].closePrice > rounds[epoch].startPrice) {
+            if(round.closePrice > round.startPrice) {
                 if (ledger[epoch][msg.sender].upAmount > 0) {
                     reward = ledger[epoch][msg.sender].upAmount.mul(rewardAmount).div(round.rewardBaseCalAmount);
                 }               
             }
-            else if (rounds[epoch].closePrice < rounds[epoch].startPrice) {
+            else if (round.closePrice < round.startPrice) {
                 if (ledger[epoch][msg.sender].downAmount > 0) {
                     reward = ledger[epoch][msg.sender].downAmount.mul(rewardAmount).div(round.rewardBaseCalAmount);
                 }               
@@ -225,6 +229,7 @@ contract BnbPricePredictionBet is Ownable {
             else {
                 if (ledger[epoch][msg.sender].downAmount.add(ledger[epoch][msg.sender].upAmount) > 0) {
                     uint256 totalBet = ledger[epoch][msg.sender].downAmount.add(ledger[epoch][msg.sender].upAmount);
+                    // emit BetTest(rewardAmount, totalBet, epoch);
                     reward = totalBet.mul(rewardAmount).div(round.rewardBaseCalAmount);
                 }                
             }          
@@ -240,8 +245,9 @@ contract BnbPricePredictionBet is Ownable {
         betInfo.claimed = true;
         if(reward > 0) {
             _safeTransferBNB(address(msg.sender), reward);
-            emit Claim(msg.sender, epoch, reward);
         }
+
+        emit Claim(msg.sender, epoch, reward);
     }
 
     /**
