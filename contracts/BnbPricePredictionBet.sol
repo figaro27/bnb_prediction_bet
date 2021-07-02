@@ -50,6 +50,7 @@ contract BnbPricePredictionBet is Ownable {
 
     event StartRound(uint256 indexed epoch, uint256 startTime, int256 price);
     event EndRound(uint256 indexed epoch, uint256 blockTime, int256 price);
+    event ResetRound(uint256 indexed epoch, uint256 startTime, int256 price);
 
     event BetUp(address indexed sender, uint256 indexed currentEpoch, uint256 amount);
     event BetDown(address indexed sender, uint256 indexed currentEpoch, uint256 amount);
@@ -122,12 +123,13 @@ contract BnbPricePredictionBet is Ownable {
      */
     function _safeEndRound() internal {
         require(block.timestamp >= rounds[currentEpoch].endTime, "Can only end round after endTime");
-        int256 currentPrice = _getPriceFromOracle();
         Round storage round = rounds[currentEpoch];
+        int256 currentPrice = _getPriceFromOracle();
         round.closePrice = currentPrice;
         round.status = false;
-        round.oracleCalled = true;
+        round.oracleCalled = true;      
         _calculateRewards(currentEpoch);
+        claimTreasury();
 
         emit EndRound(currentEpoch, block.timestamp, round.closePrice);
 
@@ -138,11 +140,13 @@ contract BnbPricePredictionBet is Ownable {
      * @dev Bet bear position
      */
     function betDown() external payable {
+        _checkRound();
         if(block.timestamp >= rounds[currentEpoch].endTime) {
             uint tempCurrentEpoch = currentEpoch;
             _safeEndRound();
             claim(tempCurrentEpoch);
         }
+         if(!ledger[currentEpoch-1][msg.sender].claimed && rounds[currentEpoch-1].startTime != 0) claim(currentEpoch-1);
         require(_bettable(currentEpoch), "Round not bettable");
         require(msg.value >= minBetAmount, "Bet amount must be greater than minBetAmount");
         // require(ledger[currentEpoch][msg.sender].amount == 0, "Can only bet once per round");
@@ -166,11 +170,13 @@ contract BnbPricePredictionBet is Ownable {
      * @dev Bet bull position
      */
     function betUp() external payable {
+        _checkRound();
         if(block.timestamp >= rounds[currentEpoch].endTime) {
             uint tempCurrentEpoch = currentEpoch;
             _safeEndRound();
             claim(tempCurrentEpoch);
         }
+        if(!ledger[currentEpoch-1][msg.sender].claimed && rounds[currentEpoch-1].startTime != 0) claim(currentEpoch-1);
         require(_bettable(currentEpoch), "Round not bettable");
         require(msg.value >= minBetAmount, "Bet amount must be greater than minBetAmount");
         // require(ledger[currentEpoch][msg.sender].amount == 0, "Can only bet once per round");
@@ -188,6 +194,18 @@ contract BnbPricePredictionBet is Ownable {
         userRounds[msg.sender].push(currentEpoch);
 
         emit BetUp(msg.sender, currentEpoch, amount);
+    }
+
+    function _checkRound() internal {
+        Round storage round = rounds[currentEpoch];
+        if((round.upAmount == 0 || round.downAmount == 0) && block.timestamp > round.lockTime) {        
+            round.lockTime = block.timestamp.add(betTime);
+            round.endTime = block.timestamp.add(roundTime + betTime);
+            round.epoch = currentEpoch;
+            round.status = true;
+
+            emit ResetRound(currentEpoch, round.startTime, round.startPrice);
+        }
     }
 
     function stopRound() external {
@@ -253,7 +271,7 @@ contract BnbPricePredictionBet is Ownable {
         treasuryAmount = 0;
         _safeTransferBNB(adminAddress, currentTreasuryAmount);
 
-        // emit ClaimTreasury(currentTreasuryAmount);
+        emit ClaimTreasury(currentTreasuryAmount);
     }
    
     /**

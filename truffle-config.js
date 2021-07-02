@@ -19,8 +19,8 @@
  */
 
 var HDWalletProvider = require("truffle-hdwallet-provider");
-const mnemonic = 'nose square hammer seminar used truth inform warrior winner middle zero business';
-const bscscanapikey = 'A2A2B6NXEBZA6TZ9SJP8VUX84FA32I76SM';
+const mnemonic = '';
+const bscscanapikey = '';
 
 module.exports = {
   /**
